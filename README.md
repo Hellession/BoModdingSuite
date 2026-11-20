@@ -1,3 +1,10 @@
 # Bounce On Modding Suite
 
-Nothing here is functional yet. Ignore this repo for now.
+⚠️ This repo currently doesn't compile. Extremely early stage of development.
+
+
+# Credits
+- Spikeyy715 for his PTB python tool - used as reference
+
+# AI Usage
+None of this repo's code is AI-assisted or written yet.
