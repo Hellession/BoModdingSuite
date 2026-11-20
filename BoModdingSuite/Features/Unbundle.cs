@@ -1,0 +1,147 @@
+using System.Diagnostics;
+using System.Text;
+using BoModdingSuite.Model;
+
+namespace BoModdingSuite.Features;
+
+public static class Unbundle
+{
+    /*
+     * Credit to Spikeyy's PtB tool for giving me clues on the format.
+     * I still haven't fully figured it out tho
+     * 
+     * DATA TYPE FORMATTING IN HASHBUNDLES:
+     * Strings always take the following structure:
+     * 1. VARINT of string length in bytes
+     * 2. string itself
+     *
+     * Format for hashbundles in these games:
+     * MAGIC NUMBERS - 50 53 42
+     * 
+     * VERSION (maybe) - 02 - for the PC port, seems to be 01 in the mobile versions
+     * Version 02 appears to support tags, Version 01 doesn't have tags
+     *
+     * FLAG - AF in the case of BO2's PC port. The flag entry might be the same for every object,
+     * as this format isn't just used for Hashbundles
+     * SIZE? - VARINT of the amount of children present... I think, because what I have doesn't match up.
+     *
+     * [List of items follows until the very end of file]
+     *
+     * FILE PATH (string) - keep reading this until the separator
+     * FLAG? - A1 (if the item has no tags) A2 (if the item HAS tags)
+     * SHA1 Marker (string) - it always says 'sha1' (73 68 61 31).
+     * SEPARATOR - 9F
+     * HASH (string) - the hash for the file, keep reading until the hex characters stop or you hit separator
+     * 
+     * [only if the item has tags]
+     * HEADER (string) - 'tags' (74 61 67 73), preceded by 04 for length
+     * SEPARATOR/FLAG? - A1
+     * TAG? (string) - [any characters]. Known tags: '-lite', '+ogg' and '+steam'.
+     * Idk what '-' or '+' before the name mean
+     * TERMINATOR - 80. It's unknown if items with multiple tags would use this as a separator or not
+     *
+     * The next entry immediately starts with the first string, in particular, its length.
+     */
+
+    public const string HashTableName = "hashtable";
+    public const string HashBundleName = "hashbundle";
+    public const string DefaultUnbundleDestination = "unbundled";
+    public const string PrematureEof = "Prematurely reached end of file";
+    
+    
+    public static void UnbundleFile(string hashtablePath, string? outputDestination = null)
+    {
+        var stopwatch = new Stopwatch();
+        stopwatch.Start();
+        try
+        {
+            if (string.IsNullOrEmpty(hashtablePath))
+            {
+                //try to find the hashtable in the current location
+                if (File.Exists(HashTableName))
+                    hashtablePath = HashTableName;
+                else if (File.Exists(Path.Join(HashBundleName, HashTableName)))
+                    hashtablePath = Path.Join(HashBundleName, HashTableName);
+                else
+                    throw new ArgumentNullException(nameof(hashtablePath),
+                        "Path of the hashbundle cannot be null, if the command isn't fired in hashbundle's directory. Unable to find hashtable of the bundle.");
+            }
+
+            if (Directory.Exists(hashtablePath))
+            {
+                //odd repeating of expressions lol
+                if (File.Exists(Path.Join(hashtablePath, HashTableName)))
+                    hashtablePath = Path.Join(hashtablePath, HashTableName);
+                else if (File.Exists(Path.Join(hashtablePath, HashBundleName, HashTableName)))
+                    hashtablePath = Path.Join(hashtablePath, HashBundleName, HashTableName);
+                else
+                    throw new ArgumentNullException(nameof(hashtablePath),
+                        "Cannot find the hashbundle at the specified directory. Make sure the directory provided contains the hashtable file within.");
+            }
+
+            if (!File.Exists(hashtablePath))
+                throw new ArgumentNullException(nameof(hashtablePath),
+                    "Specified hashtable file doesn't exist. Check your spelling.");
+
+            //output destination may not be provided
+            //if it's not, in the same folder as hashtable, created an 'unbundled' folder
+            //however you need to make sure a folder like that doesn't exist, if it does and contains 'hashtable'
+            //add a suffix to the destination until you find something that doesn't yet exist
+            //if the output destination is provided, throw an error if 'hashtable' exists in that folder
+            string hashbundleDirectory = Path.GetDirectoryName(hashtablePath) ?? throw new InvalidOperationException("The housing directory of the hashtable is either root or null.");
+            if (string.IsNullOrEmpty(outputDestination))
+            {
+                outputDestination = Path.Join(hashbundleDirectory, DefaultUnbundleDestination);
+                int suffix = 0;
+                while ((Directory.Exists(outputDestination) && File.Exists(Path.Join(outputDestination, HashTableName))) || File.Exists(outputDestination))
+                {
+                    if(suffix>=51)
+                        throw new ArgumentNullException(nameof(outputDestination),
+                            "Unable to find a fitting destination for the output. Tried over 50 names in the current folder. Please specify the output or clear out the space.");
+                    suffix++;
+                    outputDestination  = Path.Join(Path.GetDirectoryName(hashtablePath), DefaultUnbundleDestination, "_" + suffix);
+                }
+            }
+            if(Directory.Exists(outputDestination) && File.Exists(Path.Join(outputDestination, HashTableName)))
+                throw new ArgumentNullException(nameof(outputDestination),
+                    "The output location you specified already appears to have an unbundled hashtable. It will not be overwritten. Delete that folder and try again or pick a different one.");
+            if(File.Exists(outputDestination))
+                throw new ArgumentNullException(nameof(outputDestination),
+                    "A file exists at the specified output location. Cannot write things there.");
+
+            if (!Directory.Exists(outputDestination))
+                Directory.CreateDirectory(outputDestination);
+            
+            
+        }
+        catch (Exception e)
+        {
+            Program.LogLineTimed(stopwatch, e.Message);
+            //TODO: Remove when tool is complete
+            Program.LogLineTimed(stopwatch, e.StackTrace);
+        }
+    }
+
+    public static List<BundledFile> ReadHashTable(Stopwatch stopwatch, string hashtablePath)
+    {
+        //I am using a single array to not have to needlessly create new ones each time new data is read
+        byte[] buffer = new byte[255];
+        int activeIndex = 0;
+        using (FileStream fs = File.Open(hashtablePath, FileMode.Open))
+        {
+            int bytesRead = fs.Read(buffer, 0, 3);
+            if (bytesRead < 3 || buffer is not [0x50, 0x53, 0x42, ..])
+            {
+                throw new InvalidOperationException("PTB Read: Invalid file header. Either the file is not a valid hashtable or is corrupt.");
+            }
+            if(fs.Read(buffer, 0, 1) == 0)
+                throw new InvalidOperationException("PTB Read: " + PrematureEof);
+            byte ptbVersion = buffer[0];
+            if(ptbVersion != 1 && ptbVersion != 2)
+                throw new InvalidOperationException("PTB Read: Unknown PTB version " + ptbVersion);
+            Program.LogLineTimed(stopwatch, "PTB Read: Identified version " + ptbVersion);
+            
+            //Encoding.ASCII.GetString() <--- use this later
+        }
+    }
+}
