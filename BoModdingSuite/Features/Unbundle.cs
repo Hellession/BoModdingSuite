@@ -1,12 +1,16 @@
 using System.Diagnostics;
 using System.Text;
 using BoModdingSuite.Model;
+using BoModdingSuite.Model.Ptb;
 
 namespace BoModdingSuite.Features;
 
 public static class Unbundle
 {
     /*
+     * TODO: Rewrite a lot of this and move it to .md, there is no reason for this to be a huge comment.
+     * also when I wrote this initially, I had the wrong information on many parts. This is just wrong
+     * 
      * Credit to Spikeyy's PtB tool for giving me clues on the format.
      * I still haven't fully figured it out tho
      * 
@@ -46,7 +50,6 @@ public static class Unbundle
     public const string HashTableName = "hashtable";
     public const string HashBundleName = "hashbundle";
     public const string DefaultUnbundleDestination = "unbundled";
-    public const string PrematureEof = "Prematurely reached end of file";
     
     
     public static void UnbundleFile(string hashtablePath, string? outputDestination = null)
@@ -111,37 +114,22 @@ public static class Unbundle
 
             if (!Directory.Exists(outputDestination))
                 Directory.CreateDirectory(outputDestination);
-            
-            
+
+            PtbNode result;
+            try
+            {
+                result = PtbNode.ReadPtb(stopwatch, hashtablePath);
+            }
+            catch (Exception e)
+            {
+                throw new InvalidOperationException("PTB Read: " + e.Message);
+            }
         }
         catch (Exception e)
         {
             Program.LogLineTimed(stopwatch, e.Message);
             //TODO: Remove when tool is complete
             Program.LogLineTimed(stopwatch, e.StackTrace);
-        }
-    }
-
-    public static List<BundledFile> ReadHashTable(Stopwatch stopwatch, string hashtablePath)
-    {
-        //I am using a single array to not have to needlessly create new ones each time new data is read
-        byte[] buffer = new byte[255];
-        int activeIndex = 0;
-        using (FileStream fs = File.Open(hashtablePath, FileMode.Open))
-        {
-            int bytesRead = fs.Read(buffer, 0, 3);
-            if (bytesRead < 3 || buffer is not [0x50, 0x53, 0x42, ..])
-            {
-                throw new InvalidOperationException("PTB Read: Invalid file header. Either the file is not a valid hashtable or is corrupt.");
-            }
-            if(fs.Read(buffer, 0, 1) == 0)
-                throw new InvalidOperationException("PTB Read: " + PrematureEof);
-            byte ptbVersion = buffer[0];
-            if(ptbVersion != 1 && ptbVersion != 2)
-                throw new InvalidOperationException("PTB Read: Unknown PTB version " + ptbVersion);
-            Program.LogLineTimed(stopwatch, "PTB Read: Identified version " + ptbVersion);
-            
-            //Encoding.ASCII.GetString() <--- use this later
         }
     }
 }
