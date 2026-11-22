@@ -4,6 +4,10 @@ using BoModdingSuite.Util;
 
 namespace BoModdingSuite.Model.Ptb;
 
+/// <summary>
+/// Stands for Phobic Tree Binary
+/// community members read it as Phobic Table Binary, but BO2 code refers to it as 'ptree'.
+/// </summary>
 public class PtbNode
 {
     /// <summary>
@@ -26,6 +30,13 @@ public class PtbNode
     public PtbNode? Parent { get; set; }
     
     public long AddressOfName { get; set; }
+
+    public int GetTotalNodeCount()
+    {
+        if(Children != null)
+            return (IsRoot ? 0 : 1) + Children.Sum(t => t.GetTotalNodeCount());
+        return IsRoot ? 0 : 1;
+    }
 
 
     public void Read(FileStream fs, byte[] buffer)
@@ -81,6 +92,8 @@ public class PtbNode
                 Path += '/';
             Path += newChild.Name;
             newChild.Read(fs, buffer);
+            //adding this one line appears to have made the reader 50% slower
+            Children.Add(newChild);
         }
     }
 
@@ -111,9 +124,9 @@ public class PtbNode
         int offset = 0;
         using FileStream fs = File.Open(hashtablePath, FileMode.Open);
         int bytesRead = fs.Read(buffer, 0, 3);
-        if (bytesRead < 3 || buffer is not [0x50, 0x53, 0x42, ..])
+        if (bytesRead < 3 || buffer is not [0x50, 0x54, 0x42, ..])
         {
-            throw new InvalidOperationException("Invalid file header. Either the file is not a valid hashtable or is corrupt.");
+            throw new InvalidOperationException($"Invalid file header ({buffer[0]:X2} {buffer[1]:X2} {buffer[3]:X2}). Either the file is not a valid hashtable or is corrupt.");
         }
         if(fs.Read(buffer, 0, 1) == 0)
             throw new InvalidOperationException(Symbols.PrematureEof);

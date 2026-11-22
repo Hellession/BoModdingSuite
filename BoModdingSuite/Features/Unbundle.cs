@@ -52,7 +52,7 @@ public static class Unbundle
     public const string DefaultUnbundleDestination = "unbundled";
     
     
-    public static void UnbundleFile(string hashtablePath, string? outputDestination = null)
+    public static double? UnbundleFile(string? hashtablePath, string? outputDestination = null)
     {
         var stopwatch = new Stopwatch();
         stopwatch.Start();
@@ -78,13 +78,13 @@ public static class Unbundle
                 else if (File.Exists(Path.Join(hashtablePath, HashBundleName, HashTableName)))
                     hashtablePath = Path.Join(hashtablePath, HashBundleName, HashTableName);
                 else
-                    throw new ArgumentNullException(nameof(hashtablePath),
-                        "Cannot find the hashbundle at the specified directory. Make sure the directory provided contains the hashtable file within.");
+                    throw new ArgumentException(
+                        "Cannot find the hashbundle at the specified directory. Make sure the directory provided contains the hashtable file within.", nameof(hashtablePath));
             }
 
             if (!File.Exists(hashtablePath))
-                throw new ArgumentNullException(nameof(hashtablePath),
-                    "Specified hashtable file doesn't exist. Check your spelling.");
+                throw new ArgumentException(
+                    "Specified hashtable file doesn't exist. Check your spelling.", nameof(hashtablePath));
 
             //output destination may not be provided
             //if it's not, in the same folder as hashtable, created an 'unbundled' folder
@@ -102,7 +102,7 @@ public static class Unbundle
                         throw new ArgumentNullException(nameof(outputDestination),
                             "Unable to find a fitting destination for the output. Tried over 50 names in the current folder. Please specify the output or clear out the space.");
                     suffix++;
-                    outputDestination  = Path.Join(Path.GetDirectoryName(hashtablePath), DefaultUnbundleDestination, "_" + suffix);
+                    outputDestination  = Path.Join(Path.GetDirectoryName(hashtablePath), DefaultUnbundleDestination + "_" + suffix);
                 }
             }
             if(Directory.Exists(outputDestination) && File.Exists(Path.Join(outputDestination, HashTableName)))
@@ -124,12 +124,86 @@ public static class Unbundle
             {
                 throw new InvalidOperationException("PTB Read: " + e.Message);
             }
+            Program.LogLineTimed(stopwatch, $"Finished reading PTB file. Root node has {result.Length} children. Total amount of nodes: {result.GetTotalNodeCount()}");
+            if(result.Children == null)
+                throw new InvalidOperationException("Malformed hashtable: Root node's Children are null. Root node is of type " + result.Type);
+            if(result.Children.Count == 0)
+                throw new InvalidOperationException("Malformed hashtable: Root node has 0 children");
+            int copedFiles = 0;
+            int malformedFiles = 0;
+            int fileErrors = 0;
+            foreach (var file in result.Children)
+            {
+                if(file.Children == null)
+                {
+                    Program.LogLineTimed(stopwatch,
+                        $"Malformed file {file.Name}: Node's children are null. Root node is of type " + file.Type);
+                    malformedFiles++;
+                    continue;
+                }
+                if(file.Children.Count == 0)
+                {
+                    Program.LogLineTimed(stopwatch,
+                        $"Malformed file {file.Name}: Node has 0 children. Cannot determine SHA1 hash");
+                    malformedFiles++;
+                    continue;
+                }
+
+                var hashNode = file.Children.FirstOrDefault(t => t.Name == "sha1");
+                if(hashNode == null)
+                {
+                    Program.LogLineTimed(stopwatch, $"{file.Name}: Has no SHA1 hash node");
+                    malformedFiles++;
+                    continue;
+                }
+                if(hashNode.Type != PtbNodeType.Value)
+                {
+                    Program.LogLineTimed(stopwatch, $"{file.Name}: SHA1 hash node is of type {hashNode.Type}. Expected Value type");
+                    malformedFiles++;
+                    continue;
+                }
+
+                var hashedFilePath = Path.Join(hashbundleDirectory, hashNode.Value);
+                if(!File.Exists(hashedFilePath))
+                {
+                    Program.LogLineTimed(stopwatch, $"{file.Name}: Hashed file doesn't exist. Hash: {hashNode.Value}");
+                    fileErrors++;
+                    continue;
+                }
+
+                var destinationPath = Path.Join(outputDestination, file.Name);
+                var destinationDirectory = Path.GetDirectoryName(destinationPath);
+
+                if (!Directory.Exists(destinationDirectory) && destinationDirectory != null)
+                    Directory.CreateDirectory(destinationDirectory);
+                if (File.Exists(destinationPath))
+                {
+                    Program.LogLineTimed(stopwatch, $"WARNING - {file.Name} (Hash {hashNode.Value}): destination file already exists. NOT overwriting.");
+                    fileErrors++;
+                    continue;
+                }
+                File.Copy(hashedFilePath, destinationPath);
+                copedFiles++;
+            }
+            //this literally makes no sense and shouldn't be possible,
+            //but I only added this to supress the stupid warning on the following log call
+            if(result.Children == null)
+                throw new InvalidOperationException("Malformed hashtable???? somehow?: Root node's Children are null. Root node is of type " + result.Type);
+            
+            Program.LogLineTimed(stopwatch, $"Total files in bundle: {result.Length} ({result.Children.Count} children)");
+            Program.LogLineTimed(stopwatch, $"Files copied successfully: {copedFiles}");
+            Program.LogLineTimed(stopwatch, $"Malformed file nodes: {malformedFiles}");
+            Program.LogLineTimed(stopwatch, $"File errors: {fileErrors}");
+            Program.LogLineTimed(stopwatch, "Making a copy of the hashtable in the output...");
+            File.Copy(hashtablePath, Path.Join(outputDestination, HashTableName));
+            Program.LogLineTimed(stopwatch, "Operation complete.");
+            return stopwatch.Elapsed.TotalSeconds;
         }
         catch (Exception e)
         {
             Program.LogLineTimed(stopwatch, e.Message);
-            //TODO: Remove when tool is complete
-            Program.LogLineTimed(stopwatch, e.StackTrace);
         }
+
+        return null;
     }
 }
