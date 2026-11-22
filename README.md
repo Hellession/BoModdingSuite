@@ -1,7 +1,10 @@
 # Bounce On Modding Suite
 ⚠️ This repo is in very early Pre-Alpha. Expect most things to not work.
+
 The Bounce On Modding Suite is a C# CLI (console) app with set of functions used to aid in inspecting, extracting and modifying video games made by Phobic Studios (formerly Team Phobic) and IddyBiddyGames, with a particular focus on the Bounce On series.
+
 The tools intend to fully support the PC ports of [Bounce On](https://store.steampowered.com/app/4394300/Bounce_On/) and [Bounce On 2: Drallo's Demise](https://store.steampowered.com/app/4662700/Bounce_On_2_Drallos_Demise/).
+
 The objective of this app is to greatly automate conversion and modding of these games.
 
 ## Current Capabilities
@@ -44,9 +47,11 @@ Note: To make the app easier to ship to users and cleaner, properties were set i
 2. The output path should be shown to you. The application should be in the `publish` folder (there may also be a copy with multiple files in the folder housing the `publish` folder).
 
 # Credits
-- Spikeyy715 for his PTB python tool - used as reference
+- [Spikeyy715](https://www.youtube.com/@spikeyy715) for his PTB python tool - used as reference
 
 # AI Usage
 None of this repo's code was written by an AI (at the moment), but an AI has been used for explaining some concepts used to the maintainer, like JsonConverter, single-file publishing and performance practices. 
+
 Some of the code might have been based on examples provided by the AI (Claude).
+
 AI has also been used for figuring out formats that will be supported in the future (in particular, the .ptm map format).
