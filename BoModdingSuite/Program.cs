@@ -36,7 +36,7 @@ public static class Program
                     return 1;
             }
                 break;
-            case "ptbToJson":
+            case "ptbtojson":
             {
                 if (args.Length < 2)
                 {
