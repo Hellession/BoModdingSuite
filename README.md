@@ -3,7 +3,7 @@
 
 The Bounce On Modding Suite is a C# CLI (console) app with set of functions used to aid in inspecting, extracting and modifying video games made by Phobic Studios (formerly Team Phobic) and IddyBiddyGames, with a particular focus on the Bounce On series.
 
-The tools intend to fully support the PC ports of [Bounce On](https://store.steampowered.com/app/4394300/Bounce_On/) and [Bounce On 2: Drallo's Demise](https://store.steampowered.com/app/4662700/Bounce_On_2_Drallos_Demise/).
+The tools intend to fully support the PC ports of [Bounce On](https://store.steampowered.com/app/4394300/Bounce_On/) and [Bounce On 2: Drallo's Demise](https://store.steampowered.com/app/4662700/Bounce_On_2_Drallos_Demise/). Other games and mobile ports might also be supported, but they are not prioritized.
 
 The objective of this app is to greatly automate conversion and modding of these games.
 
@@ -17,7 +17,7 @@ Currently, releases aren't yet offered. You'll have to download and build the so
 # Usage
 ## Requirements
 - Have a computer
-- Own a supported video game (Bounce On, Bounce On 2: Drallo's Demise, Gravbot, etc.)
+- Own a copy of a supported video game (Bounce On, Bounce On 2: Drallo's Demise, Gravbot, etc.)
 
 ## Commands
 Open a command line in the folder with the executable.
